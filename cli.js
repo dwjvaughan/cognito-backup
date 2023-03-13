@@ -15,7 +15,7 @@ import pMap from 'p-map';
 import {
   CognitoIdentityProviderClient, ListUserPoolsCommand, AdminListGroupsForUserCommand, ListUsersCommand, ListGroupsCommand, AdminCreateUserCommand, CreateGroupCommand, AdminAddUserToGroupCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { fromIni } from '@aws-sdk/credential-providers';
+import { fromIni, fromContainerMetadata } from '@aws-sdk/credential-providers';
 
 const debug = Debug('cognito-backup');
 
@@ -32,15 +32,16 @@ const cli = meow(
     $ cognito-backup restore-groups <user-pool-id> Restore/import groups to a single user pool
 
     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION
-    can be specified in env variables or ~/.aws/credentials
-
-  Options
+    can be specified in env variables or ~/.aws/
+      
+    Options
     --region AWS region
     --file File name to export/import single pool users to (defaults to user-pool-id.json)
     --dir Path to export all pools, all users to (defaults to current dir)
     --profile utilize named profile from .aws/credentials file
     --stack-trace Log stack trace upon error
-    --concurrency More will be faster, too many may cause throttling error`,
+    --concurrency More will be faster, too many may cause throttling error
+    --use-container-metadata If this is running in ECS, use the task role to authenticate`,
   {
     importMeta: import.meta,
     flags: {
@@ -50,6 +51,9 @@ const cli = meow(
       concurrency: {
         type: 'number',
       },
+      useContainerMetadata: {
+        type: 'boolean',
+      }
     },
   },
 );
@@ -66,6 +70,8 @@ if (cli.flags.profile) {
   config.credentials = fromIni({
     profile: cli.flags.profile,
   });
+} else if (cli.flags.useContainerMetadata) {
+  config.credentials = fromContainerMetadata()
 }
 
 const cognitoIsp = new CognitoIdentityProviderClient(config);
